@@ -132,21 +132,28 @@ class State(rx.State):
 
     async def execute(self):
         prompt = self.command.strip()
+
         if not prompt:
             return
 
         self.last_command = prompt
-        self.execution_status = "Running · Qwen2.5-1.5B · vLLM · Kaggle T4"
+        self.execution_status = (
+            "Running · Agent 007 · Qwen2.5-1.5B · "
+            "vLLM · Kaggle T4"
+        )
 
         try:
-            answer = await execute_kaggle(prompt)
-            self.last_response = answer
-            self.execution_status = "Completed · Qwen2.5-1.5B · vLLM · Kaggle T4"
+            self.last_response = await execute_kaggle(prompt)
+            self.execution_status = (
+                "Completed · Qwen2.5-1.5B · "
+                "vLLM · Kaggle T4"
+            )
         except Exception as exc:
             self.last_response = f"Kaggle worker error: {exc}"
-            self.execution_status = "Worker unavailable"
+            self.execution_status = "Kaggle worker unavailable"
 
         self.command = ""
+
 
 
 # ============================================================
