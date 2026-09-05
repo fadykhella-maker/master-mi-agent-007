@@ -1,3 +1,2 @@
-
-reflex==0.9.10.post1httpx>=0.28.1
+reflex==0.9.10.post1
 httpx>=0.28.1
