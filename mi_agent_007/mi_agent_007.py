@@ -124,7 +124,7 @@ def section_title(kicker: str, title: str, subtitle: str):
     return rx.vstack(
         rx.text(
             kicker.upper(),
-            size="1",
+            font_size="10px",
             color=rx.color("gray", 10),
             letter_spacing="0.08em",
         ),
@@ -217,11 +217,13 @@ def sidebar():
     return rx.vstack(
         rx.hstack(
             rx.box(
-                rx.text("007", weight="bold", size="3"),
+                rx.text("007", weight="bold", font_size="10px"),
                 border="1px solid",
                 border_color=rx.color("gray", 6),
-                border_radius="11px",
-                padding="8px 9px",
+                border_radius="8px",
+                padding="4px 5px",
+                min_width="30px",
+                text_align="center",
             ),
             rx.vstack(
                 rx.text("MI BOND", weight="bold", size="3"),
@@ -1335,4 +1337,5 @@ app.add_page(
     index,
     title="MI BOND · Agent 007",
     description="MI BOND Agentic AI Command Center",
+    image="/mi-bond-favicon.svg",
 )
