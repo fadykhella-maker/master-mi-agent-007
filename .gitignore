@@ -1,0 +1,10 @@
+.venv/
+.web/
+.reflex/
+__pycache__/
+*.pyc
+.env
+.env.*
+backend.zip
+frontend.zip
+.DS_Store
