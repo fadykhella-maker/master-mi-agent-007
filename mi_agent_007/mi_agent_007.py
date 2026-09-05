@@ -1,4 +1,6 @@
+import os
 import reflex as rx
+from mi_agent_007.kaggle_worker import execute_kaggle
 
 
 # ============================================================
@@ -25,9 +27,19 @@ NAV_ITEMS = [
 class State(rx.State):
     page: str = "Command Center"
 
+    username: str = "fady.khella"
+    password: str = ""
+    authenticated: bool = False
+    login_error: str = ""
+    remember_device: bool = True
+
+    _expected_username: str = os.getenv("MI_BOND_USERNAME", "fady.khella")
+    _expected_password: str = os.getenv("MI_BOND_PASSWORD", "")
+
     command: str = ""
     last_command: str = ""
     execution_status: str = "Ready"
+    last_response: str = ""
 
     selected_agent: str = "Bond"
 
@@ -85,17 +97,56 @@ class State(rx.State):
         self.memory_enabled = value
 
     # --------------------------------------------------------
+    # Authentication
+    # --------------------------------------------------------
+
+    def set_username(self, value: str):
+        self.username = value
+
+    def set_password(self, value: str):
+        self.password = value
+
+    def set_remember_device(self, value: bool):
+        self.remember_device = value
+
+    def login(self):
+        if (
+            self.username.strip() == self._expected_username
+            and self.password == self._expected_password
+            and bool(self._expected_password)
+        ):
+            self.authenticated = True
+            self.login_error = ""
+            self.password = ""
+        else:
+            self.authenticated = False
+            self.login_error = "Access denied. Check your credentials."
+
+    def logout(self):
+        self.authenticated = False
+        self.password = ""
+
+    # --------------------------------------------------------
     # Execution
     # --------------------------------------------------------
 
-    def execute(self):
-        if self.command.strip():
-            self.last_command = self.command
-            self.execution_status = (
-                f"Queued · {self.selected_agent} · "
-                f"{self.selected_model} · {self.selected_compute}"
-            )
-            self.command = ""
+    async def execute(self):
+        prompt = self.command.strip()
+        if not prompt:
+            return
+
+        self.last_command = prompt
+        self.execution_status = "Running · Qwen2.5-1.5B · vLLM · Kaggle T4"
+
+        try:
+            answer = await execute_kaggle(prompt)
+            self.last_response = answer
+            self.execution_status = "Completed · Qwen2.5-1.5B · vLLM · Kaggle T4"
+        except Exception as exc:
+            self.last_response = f"Kaggle worker error: {exc}"
+            self.execution_status = "Worker unavailable"
+
+        self.command = ""
 
 
 # ============================================================
@@ -124,9 +175,9 @@ def section_title(kicker: str, title: str, subtitle: str):
     return rx.vstack(
         rx.text(
             kicker.upper(),
-            font_size="10px",
+            font_size="8px",
             color=rx.color("gray", 10),
-            letter_spacing="0.08em",
+            letter_spacing="0.10em",
         ),
         rx.heading(title, size="7"),
         rx.text(
@@ -197,7 +248,7 @@ def nav_button(icon: str, label: str):
             width="100%",
             spacing="3",
         ),
-        on_click=lambda: State.set_page(label),
+        on_click=State.set_page(label),
         width="100%",
         justify_content="flex-start",
         variant="ghost",
@@ -216,14 +267,10 @@ def sidebar():
 
     return rx.vstack(
         rx.hstack(
-            rx.box(
-                rx.text("007", weight="bold", font_size="10px"),
-                border="1px solid",
-                border_color=rx.color("gray", 6),
-                border_radius="8px",
-                padding="4px 5px",
-                min_width="30px",
-                text_align="center",
+            rx.image(
+                src="/mi-bond-favicon.svg",
+                width="26px",
+                height="26px",
             ),
             rx.vstack(
                 rx.text("MI BOND", weight="bold", size="3"),
@@ -392,12 +439,15 @@ def command_center():
                         State.selected_model,
                         [
                             "Auto",
-                            "Qwen",
-                            "Llama",
-                            "GPT",
-                            "Claude",
-                            "Grok",
-                            "Local Model",
+                            "Qwen2.5-1.5B-Instruct",
+                            "Qwen2.5-3B-Instruct",
+                            "Qwen3-4B",
+                            "Llama-3.2-3B-Instruct",
+                            "OpenClaw Gateway",
+                            "OpenAI API",
+                            "Claude API",
+                            "Grok API",
+                            "Local Ollama",
                         ],
                         State.set_selected_model,
                     ),
@@ -406,10 +456,11 @@ def command_center():
                         State.selected_runtime,
                         [
                             "Auto",
-                            "vLLM",
                             "Transformers",
+                            "vLLM",
                             "MLX",
                             "Ollama",
+                            "OpenClaw",
                             "Provider API",
                         ],
                         State.set_selected_runtime,
@@ -767,12 +818,15 @@ def settings_page():
                         State.selected_model,
                         [
                             "Auto",
-                            "Qwen",
-                            "Llama",
-                            "GPT",
-                            "Claude",
-                            "Grok",
-                            "Local Model",
+                            "Qwen2.5-1.5B-Instruct",
+                            "Qwen2.5-3B-Instruct",
+                            "Qwen3-4B",
+                            "Llama-3.2-3B-Instruct",
+                            "OpenClaw Gateway",
+                            "OpenAI API",
+                            "Claude API",
+                            "Grok API",
+                            "Local Ollama",
                         ],
                         State.set_selected_model,
                         "Model family used by the agent.",
@@ -783,10 +837,11 @@ def settings_page():
                         State.selected_runtime,
                         [
                             "Auto",
-                            "vLLM",
                             "Transformers",
+                            "vLLM",
                             "MLX",
                             "Ollama",
+                            "OpenClaw",
                             "Provider API",
                         ],
                         State.set_selected_runtime,
@@ -1115,7 +1170,7 @@ def connections_page():
                 "GitHub",
                 "Repositories · Issues · Actions",
                 "NOT CONNECTED",
-                "github",
+                "folder-git-2",
             ),
             connection_card(
                 "LinkedIn",
@@ -1320,7 +1375,242 @@ def routed_page():
     )
 
 
-def index():
+
+def login_page():
+    return rx.box(
+        rx.vstack(
+            rx.hstack(
+                rx.vstack(
+                    rx.text(
+                        "MI BOND",
+                        font_size="28px",
+                        weight="bold",
+                        color="#e2b653",
+                    ),
+                    rx.text(
+                        "AGENT 007",
+                        font_size="11px",
+                        letter_spacing=".34em",
+                        color="#dce7f2",
+                    ),
+                    spacing="0",
+                    align="start",
+                ),
+
+                rx.spacer(),
+
+                rx.vstack(
+                    rx.text(
+                        "GLOBAL COMMAND NETWORK",
+                        font_size="9px",
+                        letter_spacing=".24em",
+                        color="#bad0e6",
+                    ),
+                    rx.text(
+                        "SECURE · PRIVATE · OPERATIONAL",
+                        font_size="8px",
+                        letter_spacing=".20em",
+                        color="#708aa5",
+                    ),
+                    spacing="1",
+                    align="end",
+                ),
+
+                width="100%",
+                padding="26px 40px 0",
+            ),
+
+            rx.center(
+                rx.card(
+                    rx.vstack(
+                        rx.image(
+                            src="/mi-bond-favicon.svg",
+                            width="108px",
+                            height="108px",
+                        ),
+
+                        rx.text(
+                            "MI BOND · AGENT 007",
+                            font_size="10px",
+                            letter_spacing=".25em",
+                            color="#e2b653",
+                            weight="bold",
+                        ),
+
+                        rx.heading(
+                            "Secure Command Center",
+                            size="7",
+                            color="white",
+                            text_align="center",
+                        ),
+
+                        rx.text(
+                            "PLAN  |  REASON  |  EXECUTE",
+                            font_size="10px",
+                            letter_spacing=".28em",
+                            color="#d4aa4d",
+                        ),
+
+                        rx.vstack(
+                            rx.text("Username", size="1", color="white"),
+                            rx.input(
+                                value=State.username,
+                                on_change=State.set_username,
+                                width="100%",
+                                background="rgba(3,7,12,.90)",
+                                border_color="rgba(218,176,70,.5)",
+                            ),
+                            spacing="1",
+                            align="start",
+                            width="100%",
+                        ),
+
+                        rx.vstack(
+                            rx.text("Password", size="1", color="white"),
+                            rx.input(
+                                value=State.password,
+                                on_change=State.set_password,
+                                type="password",
+                                width="100%",
+                                background="rgba(3,7,12,.90)",
+                                border_color="rgba(39,145,229,.65)",
+                            ),
+                            spacing="1",
+                            align="start",
+                            width="100%",
+                        ),
+
+                        rx.cond(
+                            State.login_error != "",
+                            rx.text(
+                                State.login_error,
+                                color=rx.color("red", 10),
+                                size="1",
+                            ),
+                        ),
+
+                        rx.button(
+                            "Access MI BOND",
+                            on_click=State.login,
+                            width="100%",
+                            height="48px",
+                            background=(
+                                "linear-gradient(90deg,"
+                                "#f3d174 0%,"
+                                "#c99932 55%,"
+                                "#2498ed 100%)"
+                            ),
+                            color="#030507",
+                            weight="bold",
+                            font_size="15px",
+                        ),
+
+                        rx.hstack(
+                            rx.checkbox(
+                                checked=State.remember_device,
+                                on_change=State.set_remember_device,
+                            ),
+                            rx.text(
+                                "Remember this trusted device",
+                                size="1",
+                                color="#9ba8b5",
+                            ),
+                            spacing="2",
+                            width="100%",
+                        ),
+
+                        rx.text(
+                            "PRIVATE · CONFIDENTIAL · AUTHORIZED ACCESS ONLY",
+                            font_size="8px",
+                            letter_spacing=".14em",
+                            color="#718092",
+                            text_align="center",
+                        ),
+
+                        spacing="4",
+                        width="100%",
+                        align="center",
+                    ),
+
+                    width="520px",
+                    padding="34px",
+
+                    background="rgba(4,9,15,.83)",
+                    border="1px solid rgba(220,177,70,.38)",
+                    box_shadow=(
+                        "0 35px 100px rgba(0,0,0,.68),"
+                        "0 0 60px rgba(30,135,220,.10)"
+                    ),
+                    backdrop_filter="blur(18px)",
+                ),
+
+                flex="1",
+                width="100%",
+            ),
+
+            rx.hstack(
+                rx.vstack(
+                    rx.text(
+                        "WORLDWIDE INTELLIGENCE GRID",
+                        font_size="9px",
+                        letter_spacing=".22em",
+                        color="#a9bfd4",
+                    ),
+                    rx.text(
+                        "AGENTS · MODELS · TOOLS · COMPUTE",
+                        font_size="8px",
+                        letter_spacing=".17em",
+                        color="#6e8aa5",
+                    ),
+                    spacing="1",
+                    align="start",
+                ),
+
+                rx.spacer(),
+
+                rx.vstack(
+                    rx.text(
+                        '"SAME MISSION.',
+                        font_size="13px",
+                        color="#d9b359",
+                    ),
+                    rx.text(
+                        'A SMARTER WORLD."',
+                        font_size="13px",
+                        color="#d9b359",
+                    ),
+                    rx.text(
+                        "— 007",
+                        font_size="11px",
+                        color="#aab4bf",
+                    ),
+                    spacing="0",
+                    align="end",
+                ),
+
+                width="100%",
+                padding="0 40px 26px",
+            ),
+
+            width="100%",
+            min_height="100vh",
+            justify="between",
+        ),
+
+        width="100%",
+        min_height="100vh",
+
+        background_image=(
+            "linear-gradient(rgba(0,0,0,.05),rgba(0,0,0,.25)),"
+            "url('/mi-bond-world.svg')"
+        ),
+        background_size="cover",
+        background_position="center",
+        background_repeat="no-repeat",
+    )
+
+
+def dashboard_shell():
     return rx.hstack(
         sidebar(),
         page_shell(routed_page()),
@@ -1331,7 +1621,23 @@ def index():
     )
 
 
-app = rx.App()
+def index():
+    return rx.cond(
+        State.authenticated,
+        dashboard_shell(),
+        login_page(),
+    )
+
+
+app = rx.App(
+    head_components=[
+        rx.el.link(
+            rel="icon",
+            href="/mi-bond-favicon.svg",
+            type="image/svg+xml",
+        )
+    ]
+)
 
 app.add_page(
     index,
