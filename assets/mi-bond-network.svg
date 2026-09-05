@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="75%">
+      <stop offset="0%" stop-color="#101928"/>
+      <stop offset="50%" stop-color="#070b12"/>
+      <stop offset="100%" stop-color="#020304"/>
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+
+  <g fill="none" stroke="#1e83d9" stroke-opacity=".28" stroke-width="2">
+    <path d="M80 630 Q460 260 930 560 T1840 470"/>
+    <path d="M60 760 Q550 390 960 590 T1870 650"/>
+    <path d="M160 420 Q560 700 960 500 T1800 350"/>
+    <path d="M250 910 Q600 510 960 620 T1700 760"/>
+  </g>
+
+  <g fill="none" stroke="#d6a638" stroke-opacity=".35" stroke-width="1.5">
+    <ellipse cx="960" cy="540" rx="780" ry="310"/>
+    <ellipse cx="960" cy="540" rx="620" ry="225"/>
+    <ellipse cx="960" cy="540" rx="410" ry="145"/>
+  </g>
+
+  <g filter="url(#glow)">
+    <circle cx="220" cy="600" r="7" fill="#e9b948"/>
+    <circle cx="455" cy="450" r="6" fill="#1d9bf0"/>
+    <circle cx="710" cy="665" r="7" fill="#e9b948"/>
+    <circle cx="955" cy="500" r="8" fill="#1d9bf0"/>
+    <circle cx="1190" cy="640" r="7" fill="#e9b948"/>
+    <circle cx="1460" cy="440" r="6" fill="#1d9bf0"/>
+    <circle cx="1700" cy="610" r="8" fill="#e9b948"/>
+  </g>
+
+  <g fill="#d6a638" fill-opacity=".11">
+    <circle cx="960" cy="540" r="360"/>
+  </g>
+</svg>

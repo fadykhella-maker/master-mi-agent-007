@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
+<defs>
+  <radialGradient id="bg" cx="50%" cy="48%" r="74%">
+    <stop offset="0%" stop-color="#0f1b2b"/>
+    <stop offset="55%" stop-color="#05090f"/>
+    <stop offset="100%" stop-color="#010203"/>
+  </radialGradient>
+
+  <filter id="goldGlow">
+    <feGaussianBlur stdDeviation="5" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+
+  <filter id="blueGlow">
+    <feGaussianBlur stdDeviation="6" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+</defs>
+
+<rect width="1920" height="1080" fill="url(#bg)"/>
+
+<g fill="none" stroke="#d2a13b" stroke-width="2.2" stroke-opacity=".63">
+  <path d="M165 330 L225 245 360 205 475 235 525 300 480 355 405 370 355 435 280 415 225 370 Z"/>
+  <path d="M395 445 L480 470 530 545 505 645 455 760 410 790 380 690 382 590 395 510 Z"/>
+  <path d="M800 285 L895 230 1010 245 1085 290 1160 315 1210 370 1150 405 1085 405 1025 460 950 430 900 390 825 370 Z"/>
+  <path d="M945 450 L1030 440 1105 495 1120 580 1085 690 1025 775 965 715 935 620 930 520 Z"/>
+  <path d="M1120 330 L1260 300 1410 315 1510 365 1600 425 1530 470 1440 465 1375 520 1280 500 1210 445 1160 410 Z"/>
+  <path d="M1500 665 L1580 645 1640 685 1635 735 1585 765 1520 738 Z"/>
+</g>
+
+<g stroke="#1f83dd" stroke-width="1.8" fill="none">
+  <path d="M240 500 Q625 115 965 470 Q1315 180 1690 490">
+    <animate attributeName="stroke-opacity" values=".15;.85;.15" dur="4s" repeatCount="indefinite"/>
+  </path>
+  <path d="M275 635 Q650 340 975 555 Q1300 320 1650 620">
+    <animate attributeName="stroke-opacity" values=".75;.18;.75" dur="5.5s" repeatCount="indefinite"/>
+  </path>
+  <path d="M400 720 Q770 430 1020 570 Q1360 420 1580 700">
+    <animate attributeName="stroke-opacity" values=".15;.7;.15" dur="7s" repeatCount="indefinite"/>
+  </path>
+</g>
+
+<g stroke="#d3a442" stroke-width="1.5" fill="none">
+  <path d="M270 455 Q650 300 995 490 Q1320 315 1650 445">
+    <animate attributeName="stroke-opacity" values=".15;.65;.15" dur="6.5s" repeatCount="indefinite"/>
+  </path>
+</g>
+
+<g filter="url(#goldGlow)">
+  <circle cx="270" cy="485" r="7" fill="#e5b64c"/>
+  <circle cx="475" cy="470" r="6" fill="#e5b64c"/>
+  <circle cx="960" cy="485" r="7" fill="#e5b64c"/>
+  <circle cx="1350" cy="455" r="6" fill="#e5b64c"/>
+  <circle cx="1640" cy="515" r="7" fill="#e5b64c"/>
+</g>
+
+<g filter="url(#blueGlow)">
+  <circle cx="370" cy="390" r="6" fill="#1c98ef">
+    <animate attributeName="opacity" values=".25;1;.25" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="750" cy="575" r="6" fill="#1c98ef"/>
+  <circle cx="1210" cy="420" r="6" fill="#1c98ef">
+    <animate attributeName="opacity" values="1;.25;1" dur="3.2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="1480" cy="640" r="6" fill="#1c98ef"/>
+</g>
+</svg>

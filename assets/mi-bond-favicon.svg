@@ -1,14 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
   <defs>
-    <radialGradient id="g" cx="50%" cy="45%" r="60%">
-      <stop offset="0%" stop-color="#2b2414"/>
-      <stop offset="100%" stop-color="#080808"/>
+    <radialGradient id="bg" cx="50%" cy="42%" r="65%">
+      <stop offset="0%" stop-color="#172334"/>
+      <stop offset="100%" stop-color="#020305"/>
     </radialGradient>
+    <linearGradient id="gold" x1="0" x2="1">
+      <stop offset="0%" stop-color="#f3d57b"/>
+      <stop offset="45%" stop-color="#c7922d"/>
+      <stop offset="100%" stop-color="#ffe8a8"/>
+    </linearGradient>
   </defs>
-  <circle cx="32" cy="32" r="30" fill="url(#g)" stroke="#d8ad4d" stroke-width="2.5"/>
-  <circle cx="32" cy="21" r="8" fill="#d8ad4d"/>
-  <path d="M18 48c2-11 8-17 14-17s12 6 14 17" fill="#d8ad4d"/>
-  <path d="M23 35l9 9 9-9-5 16h-8z" fill="#090909"/>
-  <text x="34" y="20" fill="#fff3c9" font-family="Arial,sans-serif"
-        font-weight="700" font-size="10">007</text>
+
+  <circle cx="48" cy="48" r="44" fill="url(#bg)" stroke="url(#gold)" stroke-width="4"/>
+  <circle cx="48" cy="29" r="11" fill="url(#gold)"/>
+  <path d="M25 73c4-21 14-31 23-31s19 10 23 31z" fill="url(#gold)"/>
+  <path d="M34 49l14 15 14-15-8 27H42z" fill="#020305"/>
+  <path d="M43 48l5 7 5-7-5-4z" fill="#fff"/>
+  <text x="59" y="27" fill="#f6d979" font-size="12" font-family="Arial" font-weight="700">007</text>
 </svg>
