@@ -40,6 +40,13 @@ class State(rx.State):
     last_command: str = ""
     execution_status: str = "Ready"
     last_response: str = ""
+    worker_status: str = "ONLINE"
+    active_model: str = "Qwen2.5-1.5B-Instruct"
+    active_runtime: str = "vLLM"
+    active_compute: str = "Kaggle T4"
+    mission_count: int = 0
+    task_count: int = 0
+    approval_count: int = 0
 
     selected_agent: str = "Bond"
 
@@ -137,23 +144,30 @@ class State(rx.State):
             return
 
         self.last_command = prompt
+        self.last_response = ""
+        self.mission_count += 1
+
+        self.active_model = "Qwen2.5-1.5B-Instruct"
+        self.active_runtime = "vLLM"
+        self.active_compute = "Kaggle T4"
+
+        self.worker_status = "BUSY"
         self.execution_status = (
-            "Running · Agent 007 · Qwen2.5-1.5B · "
-            "vLLM · Kaggle T4"
+            "Executing · Agent 007 · Qwen2.5-1.5B · vLLM · Kaggle T4"
         )
 
         try:
             self.last_response = await execute_kaggle(prompt)
+            self.worker_status = "ONLINE"
             self.execution_status = (
-                "Completed · Qwen2.5-1.5B · "
-                "vLLM · Kaggle T4"
+                "Completed · Qwen2.5-1.5B · vLLM · Kaggle T4"
             )
         except Exception as exc:
             self.last_response = f"Kaggle worker error: {exc}"
+            self.worker_status = "OFFLINE"
             self.execution_status = "Kaggle worker unavailable"
 
         self.command = ""
-
 
 
 # ============================================================
@@ -269,39 +283,80 @@ def nav_button(icon: str, label: str):
 
 
 def sidebar():
-    top_items = NAV_ITEMS[:-1]
-    settings_item = NAV_ITEMS[-1]
-
     return rx.vstack(
         rx.hstack(
             rx.image(
                 src="/mi-bond-favicon.svg",
-                width="26px",
-                height="26px",
+                width="32px",
+                height="32px",
             ),
             rx.vstack(
                 rx.text("MI BOND", weight="bold", size="3"),
                 rx.text(
-                    "Agent 007",
+                    "AGENT 007",
                     size="1",
                     color=rx.color("gray", 10),
+                    letter_spacing=".14em",
                 ),
                 spacing="0",
                 align="start",
             ),
             spacing="3",
-            padding="5px 7px 18px",
+            padding="4px 7px 18px",
             align="center",
         ),
 
-        *[
-            nav_button(icon, label)
-            for icon, label in top_items
-        ],
+        nav_button("layout-dashboard", "Command Center"),
+        nav_button("messages-square", "Chats"),
+        nav_button("bot", "Agents"),
+        nav_button("list-checks", "Tasks"),
+        nav_button("workflow", "Automations"),
+        nav_button("shield-check", "Approvals"),
+        nav_button("brain", "Memory"),
+        nav_button("plug", "Connections"),
+        nav_button("cpu", "Compute"),
+        nav_button("activity", "Activity"),
 
         rx.spacer(),
 
-        nav_button(*settings_item),
+        rx.card(
+            rx.vstack(
+                rx.hstack(
+                    status_dot("online"),
+                    rx.text(
+                        "AGENT 007",
+                        weight="bold",
+                        size="2",
+                    ),
+                    rx.spacer(),
+                    rx.badge(
+                        State.worker_status,
+                        size="1",
+                        variant="soft",
+                    ),
+                    width="100%",
+                ),
+                rx.text(
+                    State.active_model,
+                    size="1",
+                    color=rx.color("gray", 10),
+                ),
+                rx.text(
+                    State.active_compute
+                    + " · "
+                    + State.active_runtime,
+                    size="1",
+                    color=rx.color("gray", 10),
+                ),
+                spacing="1",
+                align="start",
+                width="100%",
+            ),
+            padding="10px",
+            width="100%",
+        ),
+
+        nav_button("settings", "Settings"),
 
         rx.hstack(
             rx.color_mode.button(),
@@ -310,13 +365,20 @@ def sidebar():
                 size="1",
                 color=rx.color("gray", 10),
             ),
+            rx.spacer(),
+            rx.button(
+                "Logout",
+                size="1",
+                variant="ghost",
+                on_click=State.logout,
+            ),
+            width="100%",
             padding="7px",
-            spacing="2",
             align="center",
         ),
 
-        width="240px",
-        min_width="240px",
+        width="250px",
+        min_width="250px",
         height="100vh",
         padding="18px 12px",
         border_right="1px solid",
@@ -342,17 +404,18 @@ def page_shell(content):
 
 def command_center():
     return rx.vstack(
+
         rx.hstack(
             section_title(
                 "Command Center",
                 "MI BOND",
-                "One command surface for agents, models, tools, workflows and compute.",
+                "Plan, reason, route and execute missions through Agent 007.",
             ),
             rx.spacer(),
             rx.badge(
                 rx.hstack(
                     status_dot("online"),
-                    rx.text("SYSTEM READY"),
+                    rx.text("CONTROL PLANE ONLINE"),
                 ),
                 variant="soft",
                 size="2",
@@ -361,47 +424,49 @@ def command_center():
             align="start",
         ),
 
-        rx.hstack(
+        rx.grid(
             metric(
                 "Control Plane",
-                "Online",
-                "Reflex · Agent 007",
+                "ONLINE",
+                "Reflex Cloud · Agent 007",
                 "server",
             ),
             metric(
-                "Compute Router",
-                State.selected_compute,
-                "CPU · GPU · API · Local",
+                "Compute",
+                State.active_compute,
+                "Current inference route",
                 "cpu",
             ),
             metric(
-                "Model Runtime",
-                State.selected_runtime,
-                "vLLM · MLX · Ollama · API",
+                "Runtime",
+                State.active_runtime,
+                State.active_model,
                 "brain",
             ),
             metric(
-                "Approvals",
-                "0",
-                "No actions waiting",
-                "shield-check",
+                "Missions",
+                State.mission_count,
+                "Executed this session",
+                "crosshair",
             ),
+            columns="4",
             spacing="3",
             width="100%",
-            flex_wrap="wrap",
         ),
 
         rx.card(
             rx.vstack(
+
                 rx.hstack(
                     rx.vstack(
                         rx.text(
-                            "What should we accomplish?",
-                            weight="bold",
+                            "Mission Control",
                             size="5",
+                            weight="bold",
                         ),
                         rx.text(
-                            "Bond can research, reason, delegate, automate and execute.",
+                            "Tell Bond what must be accomplished. "
+                            "Agent 007 will reason, route and execute.",
                             size="2",
                             color=rx.color("gray", 10),
                         ),
@@ -418,13 +483,13 @@ def command_center():
 
                 rx.text_area(
                     placeholder=(
-                        "Ask Bond to research, build, monitor, "
-                        "schedule, analyze or execute..."
+                        "Research, analyze, build, monitor, "
+                        "schedule, investigate or execute..."
                     ),
                     value=State.command,
                     on_change=State.set_command,
-                    width="100%",
                     min_height="145px",
+                    width="100%",
                     size="3",
                 ),
 
@@ -450,7 +515,6 @@ def command_center():
                             "Qwen2.5-3B-Instruct",
                             "Qwen3-4B",
                             "Llama-3.2-3B-Instruct",
-                            "OpenClaw Gateway",
                             "OpenAI API",
                             "Claude API",
                             "Grok API",
@@ -463,11 +527,10 @@ def command_center():
                         State.selected_runtime,
                         [
                             "Auto",
-                            "Transformers",
                             "vLLM",
+                            "Transformers",
                             "MLX",
                             "Ollama",
-                            "OpenClaw",
                             "Provider API",
                         ],
                         State.set_selected_runtime,
@@ -477,10 +540,10 @@ def command_center():
                         State.selected_compute,
                         [
                             "Auto",
-                            "Reflex CPU",
-                            "Mac Apple Silicon",
                             "Kaggle T4 x2",
+                            "Mac Apple Silicon",
                             "Lightning GPU",
+                            "Reflex CPU",
                             "NVIDIA CUDA Lab",
                             "AMD ROCm Lab",
                         ],
@@ -495,7 +558,7 @@ def command_center():
                     rx.hstack(
                         rx.icon("shield-check", size=15),
                         rx.text(
-                            "Sensitive actions require approval.",
+                            "Sensitive external actions require approval.",
                             size="1",
                             color=rx.color("gray", 10),
                         ),
@@ -503,7 +566,7 @@ def command_center():
                     rx.spacer(),
                     rx.button(
                         rx.icon("send", size=16),
-                        "Execute",
+                        "Execute Mission",
                         on_click=State.execute,
                         size="3",
                     ),
@@ -514,79 +577,211 @@ def command_center():
                 spacing="4",
                 width="100%",
             ),
-            width="100%",
             padding="24px",
+            width="100%",
+        ),
+
+        rx.cond(
+            State.last_command != "",
+            rx.vstack(
+
+                rx.card(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.badge("MISSION", variant="soft"),
+                            rx.text(
+                                "Operator",
+                                weight="bold",
+                                size="2",
+                            ),
+                            rx.spacer(),
+                            rx.text(
+                                "YOU",
+                                size="1",
+                                color=rx.color("gray", 10),
+                            ),
+                            width="100%",
+                        ),
+                        rx.text(
+                            State.last_command,
+                            white_space="pre-wrap",
+                            line_height="1.6",
+                            size="2",
+                        ),
+                        spacing="3",
+                        align="start",
+                        width="100%",
+                    ),
+                    padding="20px",
+                ),
+
+                rx.card(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.image(
+                                src="/mi-bond-favicon.svg",
+                                width="28px",
+                                height="28px",
+                            ),
+                            rx.vstack(
+                                rx.text(
+                                    "AGENT 007",
+                                    weight="bold",
+                                    size="2",
+                                ),
+                                rx.text(
+                                    State.active_model
+                                    + " · "
+                                    + State.active_runtime
+                                    + " · "
+                                    + State.active_compute,
+                                    size="1",
+                                    color=rx.color("gray", 10),
+                                ),
+                                spacing="0",
+                                align="start",
+                            ),
+                            rx.spacer(),
+                            rx.badge(
+                                State.worker_status,
+                                variant="soft",
+                            ),
+                            width="100%",
+                        ),
+
+                        rx.divider(),
+
+                        rx.cond(
+                            State.last_response != "",
+                            rx.text(
+                                State.last_response,
+                                white_space="pre-wrap",
+                                line_height="1.75",
+                                size="2",
+                            ),
+                            rx.hstack(
+                                rx.spinner(size="2"),
+                                rx.text(
+                                    "Agent 007 is reasoning...",
+                                    color=rx.color("gray", 10),
+                                ),
+                                spacing="3",
+                            ),
+                        ),
+
+                        spacing="3",
+                        align="start",
+                        width="100%",
+                    ),
+                    padding="22px",
+                ),
+
+                spacing="3",
+                width="100%",
+            ),
         ),
 
         rx.grid(
+
             rx.card(
                 rx.vstack(
                     rx.hstack(
                         rx.icon("activity", size=18),
-                        rx.text("EXECUTION TRACE", weight="bold"),
+                        rx.text(
+                            "EXECUTION TRACE",
+                            weight="bold",
+                        ),
+                        rx.spacer(),
+                        rx.badge(
+                            State.worker_status,
+                            variant="soft",
+                        ),
+                        width="100%",
                     ),
+
                     rx.divider(),
+
                     rx.hstack(
                         status_dot("online"),
-                        rx.text(State.execution_status, size="2"),
-                    ),
-                    rx.cond(
-                        State.last_command != "",
-                        rx.box(
-                            rx.text(
-                                "LAST COMMAND",
-                                size="1",
-                                color=rx.color("gray", 10),
-                            ),
-                            rx.text(State.last_command, size="2"),
-                            padding="14px",
-                            width="100%",
-                            border_radius="9px",
-                            background=rx.color("gray", 2),
+                        rx.text(
+                            State.execution_status,
+                            size="2",
                         ),
                     ),
+
+                    rx.vstack(
+                        rx.text(
+                            "ACTIVE ROUTE",
+                            size="1",
+                            color=rx.color("gray", 10),
+                        ),
+                        rx.text(
+                            "Agent 007 → "
+                            + State.active_model
+                            + " → "
+                            + State.active_runtime
+                            + " → "
+                            + State.active_compute,
+                            size="2",
+                        ),
+                        spacing="1",
+                        align="start",
+                    ),
+
                     rx.text(
-                        "Future: tool calls, retries, latency, tokens, cost and intermediate agent steps.",
+                        "Tool calls, approvals, retries, tokens, "
+                        "latency and artifacts will appear here "
+                        "as those execution layers are enabled.",
                         size="1",
                         color=rx.color("gray", 10),
                     ),
+
                     spacing="3",
                     align="start",
                     width="100%",
                 ),
+                padding="20px",
             ),
 
             rx.card(
                 rx.vstack(
                     rx.hstack(
                         rx.icon("cpu", size=18),
-                        rx.text("COMPUTE STATUS", weight="bold"),
+                        rx.text(
+                            "COMPUTE FABRIC",
+                            weight="bold",
+                        ),
                     ),
+
                     rx.divider(),
 
                     compute_row(
                         "Reflex Cloud",
-                        "CPU · Control Plane",
+                        "Persistent control plane",
                         "online",
                     ),
-                    compute_row(
-                        "Mac",
-                        "Apple Silicon · Optional Worker",
-                        "online",
-                    ),
+
                     compute_row(
                         "Kaggle",
-                        "NVIDIA T4 ×2 · GPU Worker",
+                        "NVIDIA T4 ×2 · vLLM worker",
+                        "online",
+                    ),
+
+                    compute_row(
+                        "Mac",
+                        "Apple Silicon · MLX / Ollama",
                         "standby",
                     ),
+
                     compute_row(
                         "Lightning",
-                        "Cloud GPU Worker",
+                        "Optional GPU fallback",
                         "standby",
                     ),
+
                     compute_row(
-                        "NVIDIA CUDA Lab",
-                        "Remote CUDA Worker",
+                        "CUDA / ROCm Labs",
+                        "Engineering workers",
                         "standby",
                     ),
 
@@ -594,6 +789,7 @@ def command_center():
                     align="start",
                     width="100%",
                 ),
+                padding="20px",
             ),
 
             columns="2",
@@ -602,7 +798,7 @@ def command_center():
         ),
 
         width="100%",
-        max_width="1450px",
+        max_width="1500px",
         padding="34px 40px",
         spacing="5",
         align="stretch",
@@ -1324,6 +1520,480 @@ def simple_page(title: str, subtitle: str, icon: str):
     )
 
 
+
+def workspace_metric(title, value, detail, icon):
+    return rx.card(
+        rx.vstack(
+            rx.hstack(
+                rx.icon(icon, size=16),
+                rx.text(
+                    title.upper(),
+                    size="1",
+                    color=rx.color("gray", 10),
+                ),
+            ),
+            rx.text(
+                value,
+                size="5",
+                weight="bold",
+            ),
+            rx.text(
+                detail,
+                size="1",
+                color=rx.color("gray", 10),
+            ),
+            spacing="2",
+            align="start",
+        ),
+        flex="1",
+    )
+
+
+def chats_page():
+    return rx.vstack(
+        section_title(
+            "Sessions",
+            "Chats",
+            "Persistent conversations and resumable Agent 007 missions.",
+        ),
+
+        rx.hstack(
+            rx.button(
+                rx.icon("plus", size=16),
+                "New Chat",
+            ),
+            rx.input(
+                placeholder="Search conversations...",
+                max_width="420px",
+            ),
+            spacing="3",
+        ),
+
+        rx.grid(
+            workspace_metric(
+                "Active",
+                "1",
+                "Current command session",
+                "messages-square",
+            ),
+            workspace_metric(
+                "Saved",
+                "0",
+                "Persistent history layer",
+                "archive",
+            ),
+            workspace_metric(
+                "Model",
+                State.active_model,
+                "Current route",
+                "brain",
+            ),
+            columns="3",
+            spacing="3",
+            width="100%",
+        ),
+
+        rx.card(
+            rx.vstack(
+                rx.hstack(
+                    rx.image(
+                        src="/mi-bond-favicon.svg",
+                        width="28px",
+                    ),
+                    rx.vstack(
+                        rx.text(
+                            "MI Command Center",
+                            weight="bold",
+                        ),
+                        rx.text(
+                            State.execution_status,
+                            size="1",
+                            color=rx.color("gray", 10),
+                        ),
+                        spacing="0",
+                        align="start",
+                    ),
+                    rx.spacer(),
+                    rx.badge(
+                        "ACTIVE",
+                        variant="soft",
+                    ),
+                    width="100%",
+                ),
+
+                rx.divider(),
+
+                rx.text(
+                    "Conversation persistence, titles, search, "
+                    "branching and archival will use the future "
+                    "MI BOND storage layer.",
+                    color=rx.color("gray", 10),
+                    size="2",
+                ),
+
+                spacing="3",
+                align="start",
+                width="100%",
+            ),
+            padding="22px",
+        ),
+
+        width="100%",
+        max_width="1450px",
+        padding="34px 40px",
+        spacing="5",
+        align="stretch",
+    )
+
+
+def tasks_page():
+    return rx.vstack(
+        section_title(
+            "Mission Queue",
+            "Tasks",
+            "Track objectives from intake through execution and completion.",
+        ),
+
+        rx.grid(
+            workspace_metric(
+                "Queued",
+                "0",
+                "Waiting",
+                "clock",
+            ),
+            workspace_metric(
+                "Running",
+                "0",
+                "In execution",
+                "activity",
+            ),
+            workspace_metric(
+                "Completed",
+                State.mission_count,
+                "Session missions",
+                "circle-check",
+            ),
+            workspace_metric(
+                "Failed",
+                "0",
+                "Needs attention",
+                "triangle-alert",
+            ),
+            columns="4",
+            spacing="3",
+            width="100%",
+        ),
+
+        rx.card(
+            rx.vstack(
+                rx.hstack(
+                    rx.icon(
+                        "list-checks",
+                        size=18,
+                    ),
+                    rx.text(
+                        "MISSION QUEUE",
+                        weight="bold",
+                    ),
+                    rx.spacer(),
+                    rx.button(
+                        rx.icon("plus", size=15),
+                        "New Task",
+                        size="2",
+                    ),
+                    width="100%",
+                ),
+
+                rx.divider(),
+
+                rx.cond(
+                    State.last_command != "",
+                    rx.hstack(
+                        status_dot("online"),
+                        rx.vstack(
+                            rx.text(
+                                State.last_command,
+                                weight="medium",
+                            ),
+                            rx.text(
+                                State.execution_status,
+                                size="1",
+                                color=rx.color("gray", 10),
+                            ),
+                            spacing="0",
+                            align="start",
+                        ),
+                        rx.spacer(),
+                        rx.badge(
+                            "LATEST",
+                            variant="soft",
+                        ),
+                        width="100%",
+                    ),
+                    rx.text(
+                        "No missions have been submitted yet.",
+                        color=rx.color("gray", 10),
+                    ),
+                ),
+
+                spacing="3",
+                align="start",
+                width="100%",
+            ),
+            padding="22px",
+        ),
+
+        width="100%",
+        max_width="1450px",
+        padding="34px 40px",
+        spacing="5",
+        align="stretch",
+    )
+
+
+def approvals_page():
+    return rx.vstack(
+        section_title(
+            "Human Control",
+            "Approvals",
+            "Review sensitive external actions before execution.",
+        ),
+
+        rx.grid(
+            workspace_metric(
+                "Waiting",
+                State.approval_count,
+                "Pending review",
+                "shield-check",
+            ),
+            workspace_metric(
+                "Policy",
+                State.approval_mode,
+                "Current safety mode",
+                "lock-keyhole",
+            ),
+            workspace_metric(
+                "Protected",
+                "External",
+                "Send · modify · publish · delete",
+                "shield",
+            ),
+            columns="3",
+            spacing="3",
+            width="100%",
+        ),
+
+        rx.card(
+            rx.vstack(
+                rx.hstack(
+                    rx.icon(
+                        "shield-check",
+                        size=20,
+                    ),
+                    rx.text(
+                        "APPROVAL QUEUE",
+                        weight="bold",
+                    ),
+                ),
+
+                rx.divider(),
+
+                rx.text(
+                    "No actions are waiting for approval.",
+                    size="3",
+                    weight="medium",
+                ),
+
+                rx.text(
+                    "Email sends, repository writes, publishing, "
+                    "destructive operations and other sensitive "
+                    "actions will stop here before execution.",
+                    size="2",
+                    color=rx.color("gray", 10),
+                ),
+
+                spacing="3",
+                align="start",
+                width="100%",
+            ),
+            padding="24px",
+        ),
+
+        width="100%",
+        max_width="1450px",
+        padding="34px 40px",
+        spacing="5",
+        align="stretch",
+    )
+
+
+def memory_page():
+    return rx.vstack(
+        section_title(
+            "Operational Context",
+            "Memory",
+            "Control what Agent 007 can retain and retrieve.",
+        ),
+
+        rx.grid(
+            workspace_metric(
+                "Session",
+                "ACTIVE",
+                "Current mission context",
+                "messages-square",
+            ),
+            workspace_metric(
+                "Long-term",
+                "ENABLED",
+                "Approved context only",
+                "brain",
+            ),
+            workspace_metric(
+                "Projects",
+                "0",
+                "Memory namespaces",
+                "folder",
+            ),
+            columns="3",
+            spacing="3",
+            width="100%",
+        ),
+
+        rx.card(
+            rx.vstack(
+                rx.hstack(
+                    rx.icon(
+                        "brain",
+                        size=20,
+                    ),
+                    rx.text(
+                        "MEMORY CONTROL",
+                        weight="bold",
+                    ),
+                ),
+
+                rx.divider(),
+
+                rx.text(
+                    "Memory stays independent from model providers. "
+                    "Agent 007 will select the context supplied to "
+                    "each model or worker.",
+                    size="2",
+                ),
+
+                rx.text(
+                    "Next layer: persistence, namespaces, retrieval, "
+                    "retention controls and explicit forget operations.",
+                    size="2",
+                    color=rx.color("gray", 10),
+                ),
+
+                spacing="3",
+                align="start",
+                width="100%",
+            ),
+            padding="24px",
+        ),
+
+        width="100%",
+        max_width="1450px",
+        padding="34px 40px",
+        spacing="5",
+        align="stretch",
+    )
+
+
+def activity_page():
+    return rx.vstack(
+        section_title(
+            "Audit & Observability",
+            "Activity",
+            "Inspect missions, routing, workers and future tool activity.",
+        ),
+
+        rx.grid(
+            workspace_metric(
+                "Missions",
+                State.mission_count,
+                "Current session",
+                "crosshair",
+            ),
+            workspace_metric(
+                "Worker",
+                State.worker_status,
+                "Kaggle inference",
+                "cpu",
+            ),
+            workspace_metric(
+                "Model",
+                State.active_model,
+                "Active intelligence",
+                "brain",
+            ),
+            columns="3",
+            spacing="3",
+            width="100%",
+        ),
+
+        rx.card(
+            rx.vstack(
+                rx.hstack(
+                    rx.icon(
+                        "activity",
+                        size=20,
+                    ),
+                    rx.text(
+                        "LATEST ACTIVITY",
+                        weight="bold",
+                    ),
+                ),
+
+                rx.divider(),
+
+                rx.hstack(
+                    status_dot("online"),
+                    rx.vstack(
+                        rx.text(
+                            State.execution_status,
+                            weight="medium",
+                        ),
+                        rx.cond(
+                            State.last_command != "",
+                            rx.text(
+                                State.last_command,
+                                size="1",
+                                color=rx.color("gray", 10),
+                            ),
+                        ),
+                        spacing="0",
+                        align="start",
+                    ),
+                    width="100%",
+                ),
+
+                rx.text(
+                    "Future audit records will include timestamps, "
+                    "latency, tokens, cost, retries, tool calls, "
+                    "approvals and artifacts.",
+                    size="1",
+                    color=rx.color("gray", 10),
+                ),
+
+                spacing="3",
+                align="start",
+                width="100%",
+            ),
+            padding="24px",
+        ),
+
+        width="100%",
+        max_width="1450px",
+        padding="34px 40px",
+        spacing="5",
+        align="stretch",
+    )
+
+
 # ============================================================
 # PAGE ROUTER
 # ============================================================
@@ -1333,54 +2003,18 @@ def routed_page():
     return rx.match(
         State.page,
         ("Command Center", command_center()),
+        ("Chats", chats_page()),
         ("Agents", agents_page()),
+        ("Tasks", tasks_page()),
         ("Automations", automations_page()),
+        ("Approvals", approvals_page()),
+        ("Memory", memory_page()),
         ("Connections", connections_page()),
         ("Compute", compute_page()),
+        ("Activity", activity_page()),
         ("Settings", settings_page()),
-        (
-            "Chats",
-            simple_page(
-                "Chats",
-                "Persistent conversations and agent sessions.",
-                "messages-square",
-            ),
-        ),
-        (
-            "Tasks",
-            simple_page(
-                "Tasks",
-                "Track queued, running, completed and failed work.",
-                "list-checks",
-            ),
-        ),
-        (
-            "Approvals",
-            simple_page(
-                "Approvals",
-                "Review sensitive actions before Bond executes them.",
-                "shield-check",
-            ),
-        ),
-        (
-            "Memory",
-            simple_page(
-                "Memory",
-                "Control long-term operational knowledge and retrieval.",
-                "brain",
-            ),
-        ),
-        (
-            "Activity",
-            simple_page(
-                "Activity",
-                "Audit agent actions, model calls, tools and compute usage.",
-                "activity",
-            ),
-        ),
         command_center(),
     )
-
 
 
 def login_page():
