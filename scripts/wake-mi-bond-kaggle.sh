@@ -5,23 +5,32 @@ set -e
 KERNEL="confidentialnvidia/confidential-mi-agent-007"
 
 echo
-echo "=============================================="
+echo "===================================================="
 echo "MI BOND / AGENT 007 — KAGGLE WAKE"
-echo "=============================================="
+echo "===================================================="
+
 echo
-echo "Kernel:"
+echo "Target Kaggle notebook:"
 echo "$KERNEL"
-echo
 
 if ! command -v kaggle >/dev/null 2>&1; then
-    echo "ERROR: Kaggle CLI is not installed."
-    exit 1
+    echo
+    echo "Kaggle CLI not found."
+
+    if command -v python3 >/dev/null 2>&1; then
+        echo "Installing Kaggle CLI..."
+        python3 -m pip install -U kaggle
+    else
+        echo "ERROR: Python 3 is not available."
+        exit 1
+    fi
 fi
 
+echo
 echo "Kaggle CLI:"
 kaggle --version
 
-TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mi-bond-wake.XXXXXX")"
+TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mi-bond-agent007-wake.XXXXXX")"
 
 cleanup() {
     rm -rf "$TMP_DIR"
@@ -30,8 +39,9 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo
-echo "Downloading current MI BOND notebook..."
-echo
+echo "===================================================="
+echo "PULL CURRENT AGENT 007 NOTEBOOK"
+echo "===================================================="
 
 kaggle kernels pull \
     "$KERNEL" \
@@ -39,12 +49,12 @@ kaggle kernels pull \
     -m
 
 echo
-echo "Downloaded files:"
+echo "Downloaded:"
 ls -la "$TMP_DIR"
 
 if [ ! -f "$TMP_DIR/kernel-metadata.json" ]; then
     echo
-    echo "ERROR: kernel-metadata.json was not downloaded."
+    echo "ERROR: Kaggle metadata was not downloaded."
     exit 1
 fi
 
@@ -61,40 +71,38 @@ data = json.loads(
     )
 )
 
-expected = (
-    "confidentialnvidia/"
-    "confidential-mi-agent-007"
-)
-
+expected = "confidentialnvidia/confidential-mi-agent-007"
 actual = data.get("id", "")
 
 print()
-print("Kernel metadata ID:")
+print("Metadata kernel ID:")
 print(actual)
 
 if actual != expected:
     raise SystemExit(
-        "ERROR: Refusing to push. "
-        f"Expected {expected!r}, got {actual!r}"
+        f"ERROR: Expected {expected!r}, got {actual!r}"
     )
 
-print("Metadata verified.")
+print("Agent 007 notebook verified.")
 PY
 
 echo
-echo "=============================================="
-echo "TRIGGERING MI BOND KAGGLE RUN"
-echo "=============================================="
+echo "===================================================="
+echo "TRIGGER KAGGLE RUN"
+echo "===================================================="
 
 kaggle kernels push \
     -p "$TMP_DIR"
 
 echo
 echo "Wake request submitted."
+
 echo
-echo "=============================================="
-echo "WATCHING AGENT 007 STATUS"
-echo "=============================================="
+echo "===================================================="
+echo "WATCH KAGGLE STATUS"
+echo "===================================================="
+
+SUCCESS=0
 
 for i in $(seq 1 40); do
 
@@ -102,9 +110,7 @@ for i in $(seq 1 40); do
     echo "Status check $i / 40"
 
     STATUS="$(
-        kaggle kernels status \
-        "$KERNEL" \
-        2>&1 || true
+        kaggle kernels status "$KERNEL" 2>&1 || true
     )"
 
     echo "$STATUS"
@@ -116,34 +122,40 @@ for i in $(seq 1 40); do
 
     if printf '%s' "$LOWER" | grep -q "error"; then
         echo
-        echo "ERROR: MI BOND Kaggle notebook entered an error state."
+        echo "ERROR: Agent 007 Kaggle notebook entered error state."
         exit 1
     fi
 
     if printf '%s' "$LOWER" | grep -q "cancel"; then
         echo
-        echo "ERROR: MI BOND Kaggle notebook was cancelled."
+        echo "ERROR: Agent 007 Kaggle notebook was cancelled."
         exit 1
     fi
 
     if printf '%s' "$LOWER" | grep -q "running"; then
         echo
-        echo "=============================================="
-        echo "AGENT 007 KAGGLE WORKER IS RUNNING"
-        echo "=============================================="
-        exit 0
+        echo "===================================================="
+        echo "AGENT 007 KAGGLE NOTEBOOK IS RUNNING"
+        echo "===================================================="
+        SUCCESS=1
+        break
     fi
 
     if printf '%s' "$LOWER" | grep -q "complete"; then
         echo
-        echo "Notebook completed."
-        echo "Check whether its worker/tunnel remains alive."
-        exit 0
+        echo "Kaggle notebook completed."
+        SUCCESS=1
+        break
     fi
 
     sleep 15
 done
 
+if [ "$SUCCESS" -ne 1 ]; then
+    echo
+    echo "ERROR: Timed out waiting for Agent 007 Kaggle status."
+    exit 1
+fi
+
 echo
-echo "Timed out waiting for a final Kaggle status."
-exit 1
+echo "Temporary wake copy removed automatically."
