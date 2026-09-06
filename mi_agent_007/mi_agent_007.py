@@ -1,6 +1,7 @@
 import os
 import reflex as rx
-from mi_agent_007.kaggle_worker import execute_kaggle
+from mi_agent_007.router import execute as execute_route
+from mi_agent_007.router import provider_health
 
 
 # ============================================================
@@ -40,7 +41,8 @@ class State(rx.State):
     last_command: str = ""
     execution_status: str = "Ready"
     last_response: str = ""
-    worker_status: str = "ONLINE"
+    worker_status: str = "UNKNOWN"
+    provider_summary: str = "Not checked"
     active_model: str = "Qwen2.5-1.5B-Instruct"
     active_runtime: str = "vLLM"
     active_compute: str = "Kaggle T4"
@@ -137,6 +139,43 @@ class State(rx.State):
     # Execution
     # --------------------------------------------------------
 
+    async def refresh_providers(self):
+        self.worker_status = "CHECKING"
+        self.provider_summary = "Checking available providers..."
+
+        try:
+            health = await provider_health()
+
+            parts = []
+
+            if health.get("kaggle"):
+                parts.append("Kaggle")
+            if health.get("openai"):
+                parts.append("OpenAI")
+            if health.get("anthropic"):
+                parts.append("Claude")
+            if health.get("xai"):
+                parts.append("Grok")
+            if health.get("ollama"):
+                parts.append("Ollama")
+
+            if health.get("kaggle"):
+                self.worker_status = "ONLINE"
+            elif parts:
+                self.worker_status = "FALLBACK"
+            else:
+                self.worker_status = "OFFLINE"
+
+            self.provider_summary = (
+                " · ".join(parts)
+                if parts
+                else "No inference providers available"
+            )
+
+        except Exception as exc:
+            self.worker_status = "OFFLINE"
+            self.provider_summary = f"Provider check failed: {exc}"
+
     async def execute(self):
         prompt = self.command.strip()
 
@@ -147,25 +186,59 @@ class State(rx.State):
         self.last_response = ""
         self.mission_count += 1
 
-        self.active_model = "Qwen2.5-1.5B-Instruct"
-        self.active_runtime = "vLLM"
-        self.active_compute = "Kaggle T4"
-
-        self.worker_status = "BUSY"
+        self.worker_status = "ROUTING"
         self.execution_status = (
-            "Executing · Agent 007 · Qwen2.5-1.5B · vLLM · Kaggle T4"
+            f"Routing mission · {self.selected_agent} · "
+            f"{self.selected_model} · "
+            f"{self.selected_runtime} · "
+            f"{self.selected_compute}"
         )
 
         try:
-            self.last_response = await execute_kaggle(prompt)
-            self.worker_status = "ONLINE"
-            self.execution_status = (
-                "Completed · Qwen2.5-1.5B · vLLM · Kaggle T4"
+            try:
+                temperature = float(self.temperature)
+            except Exception:
+                temperature = 0.4
+
+            try:
+                max_tokens = int(self.max_tokens)
+            except Exception:
+                max_tokens = 800
+
+            result = await execute_route(
+                prompt=prompt,
+                agent=self.selected_agent,
+                selected_model=self.selected_model,
+                selected_runtime=self.selected_runtime,
+                selected_compute=self.selected_compute,
+                temperature=temperature,
+                max_tokens=max_tokens,
             )
+
+            self.last_response = result.text
+
+            self.active_model = result.model
+            self.active_runtime = result.runtime
+            self.active_compute = result.compute
+
+            self.worker_status = "ONLINE"
+
+            self.execution_status = (
+                f"Completed · {result.provider} · "
+                f"{result.model} · "
+                f"{result.runtime} · "
+                f"{result.compute}"
+            )
+
+            self.provider_summary = result.provider
+
         except Exception as exc:
-            self.last_response = f"Kaggle worker error: {exc}"
+            self.last_response = (
+                "Agent 007 could not obtain an inference route.\n\n"
+                f"{exc}"
+            )
             self.worker_status = "OFFLINE"
-            self.execution_status = "Kaggle worker unavailable"
+            self.execution_status = "No inference route available"
 
         self.command = ""
 
@@ -512,9 +585,7 @@ def command_center():
                         [
                             "Auto",
                             "Qwen2.5-1.5B-Instruct",
-                            "Qwen2.5-3B-Instruct",
-                            "Qwen3-4B",
-                            "Llama-3.2-3B-Instruct",
+                            "Qwen2.5-1.5B-Instruct",
                             "OpenAI API",
                             "Claude API",
                             "Grok API",
@@ -832,107 +903,239 @@ def compute_row(name: str, description: str, status: str):
 
 def compute_page():
     return rx.vstack(
-        section_title(
-            "Infrastructure",
-            "Compute",
-            "Choose where Bond executes CPU, GPU and model inference workloads.",
+        rx.hstack(
+            section_title(
+                "Inference Fabric",
+                "Compute",
+                (
+                    "Live routing status across MI BOND inference "
+                    "and execution providers."
+                ),
+            ),
+            rx.spacer(),
+            rx.button(
+                rx.icon("refresh-cw", size=15),
+                "Refresh Providers",
+                on_click=State.refresh_providers,
+                variant="soft",
+            ),
+            width="100%",
+            align="start",
+        ),
+
+        rx.grid(
+            metric(
+                "Agent Status",
+                State.worker_status,
+                State.provider_summary,
+                "activity",
+            ),
+            metric(
+                "Active Model",
+                State.active_model,
+                "Last successful mission",
+                "brain",
+            ),
+            metric(
+                "Runtime",
+                State.active_runtime,
+                "Current runtime",
+                "server",
+            ),
+            metric(
+                "Compute",
+                State.active_compute,
+                "Current compute route",
+                "cpu",
+            ),
+            columns="4",
+            spacing="3",
+            width="100%",
         ),
 
         rx.card(
             rx.vstack(
-                rx.heading("Default routing", size="4"),
+                rx.hstack(
+                    status_dot("online"),
+                    rx.vstack(
+                        rx.text(
+                            "Kaggle GPU Worker",
+                            weight="bold",
+                        ),
+                        rx.text(
+                            "Qwen2.5-1.5B · vLLM · NVIDIA T4",
+                            size="1",
+                            color=rx.color("gray", 10),
+                        ),
+                        spacing="0",
+                        align="start",
+                    ),
+                    rx.spacer(),
+                    rx.text(
+                        (
+                            "Primary free inference route. "
+                            "Health is checked before Auto routing."
+                        ),
+                        size="1",
+                        color=rx.color("gray", 10),
+                    ),
+                    width="100%",
+                    align="center",
+                ),
 
-                rx.grid(
-                    setting_select(
-                        "Default Compute",
-                        State.selected_compute,
-                        [
-                            "Auto",
-                            "Reflex CPU",
-                            "Mac Apple Silicon",
-                            "Kaggle T4 x2",
-                            "Lightning GPU",
-                            "NVIDIA CUDA Lab",
-                            "AMD ROCm Lab",
-                        ],
-                        State.set_selected_compute,
-                        "The preferred execution host.",
+                rx.divider(),
+
+                rx.hstack(
+                    status_dot("standby"),
+                    rx.vstack(
+                        rx.text(
+                            "OpenAI",
+                            weight="bold",
+                        ),
+                        rx.text(
+                            "Provider API fallback",
+                            size="1",
+                            color=rx.color("gray", 10),
+                        ),
+                        spacing="0",
+                        align="start",
                     ),
-                    setting_select(
-                        "Routing Policy",
-                        State.routing_policy,
-                        [
-                            "Balanced",
-                            "GPU First",
-                            "Fastest",
-                            "Lowest Cost",
-                            "Local Only",
-                            "Best Quality",
-                        ],
-                        State.set_routing_policy,
-                        "Controls how Bond selects compute.",
+                    rx.spacer(),
+                    rx.text(
+                        "Enabled when OPENAI_API_KEY exists.",
+                        size="1",
+                        color=rx.color("gray", 10),
                     ),
-                    columns="2",
-                    spacing="4",
+                    width="100%",
+                ),
+
+                rx.divider(),
+
+                rx.hstack(
+                    status_dot("standby"),
+                    rx.vstack(
+                        rx.text(
+                            "Anthropic Claude",
+                            weight="bold",
+                        ),
+                        rx.text(
+                            "Provider API fallback",
+                            size="1",
+                            color=rx.color("gray", 10),
+                        ),
+                        spacing="0",
+                        align="start",
+                    ),
+                    rx.spacer(),
+                    rx.text(
+                        "Enabled when ANTHROPIC_API_KEY exists.",
+                        size="1",
+                        color=rx.color("gray", 10),
+                    ),
+                    width="100%",
+                ),
+
+                rx.divider(),
+
+                rx.hstack(
+                    status_dot("standby"),
+                    rx.vstack(
+                        rx.text(
+                            "xAI Grok",
+                            weight="bold",
+                        ),
+                        rx.text(
+                            "Provider API fallback",
+                            size="1",
+                            color=rx.color("gray", 10),
+                        ),
+                        spacing="0",
+                        align="start",
+                    ),
+                    rx.spacer(),
+                    rx.text(
+                        "Enabled when XAI_API_KEY exists.",
+                        size="1",
+                        color=rx.color("gray", 10),
+                    ),
+                    width="100%",
+                ),
+
+                rx.divider(),
+
+                rx.hstack(
+                    status_dot("standby"),
+                    rx.vstack(
+                        rx.text(
+                            "Mac Local",
+                            weight="bold",
+                        ),
+                        rx.text(
+                            "Ollama / local inference",
+                            size="1",
+                            color=rx.color("gray", 10),
+                        ),
+                        spacing="0",
+                        align="start",
+                    ),
+                    rx.spacer(),
+                    rx.text(
+                        (
+                            "Requires a secure reachable "
+                            "OLLAMA_BASE_URL from Reflex Cloud."
+                        ),
+                        size="1",
+                        color=rx.color("gray", 10),
+                    ),
                     width="100%",
                 ),
 
                 spacing="4",
+                align="stretch",
                 width="100%",
             ),
             padding="24px",
         ),
 
-        rx.grid(
-            compute_card(
-                "Reflex Cloud",
-                "Control Plane",
-                "CPU",
-                "Online",
-                "Persistent UI, scheduler and orchestration.",
+        rx.card(
+            rx.vstack(
+                rx.hstack(
+                    rx.icon("route", size=18),
+                    rx.text(
+                        "AUTO ROUTING ORDER",
+                        weight="bold",
+                    ),
+                ),
+                rx.divider(),
+                rx.text(
+                    (
+                        "1. Kaggle / Qwen / vLLM  →  "
+                        "2. OpenAI  →  "
+                        "3. Claude  →  "
+                        "4. Grok  →  "
+                        "5. Local Ollama"
+                    ),
+                    size="2",
+                ),
+                rx.text(
+                    (
+                        "Explicit model selection overrides Auto. "
+                        "If an explicitly selected provider is "
+                        "unavailable, MI BOND reports the error "
+                        "instead of silently pretending it executed."
+                    ),
+                    size="1",
+                    color=rx.color("gray", 10),
+                ),
+                spacing="3",
+                align="start",
+                width="100%",
             ),
-            compute_card(
-                "Kaggle",
-                "GPU Worker",
-                "NVIDIA T4 ×2",
-                "Standby",
-                "Primary free GPU inference target.",
-            ),
-            compute_card(
-                "Mac",
-                "Local Worker",
-                "Apple Silicon",
-                "Available",
-                "MLX / Ollama / CPU tools.",
-            ),
-            compute_card(
-                "Lightning",
-                "GPU Worker",
-                "Cloud GPU",
-                "Standby",
-                "Optional cloud inference fallback.",
-            ),
-            compute_card(
-                "NVIDIA CUDA Lab",
-                "Remote Worker",
-                "CUDA",
-                "Standby",
-                "Existing NVIDIA engineering environment.",
-            ),
-            compute_card(
-                "AMD ROCm Lab",
-                "Future Worker",
-                "ROCm",
-                "Planned",
-                "Portable AMD accelerated inference.",
-            ),
-            columns="3",
-            spacing="3",
-            width="100%",
+            padding="22px",
         ),
 
         width="100%",
-        max_width="1450px",
+        max_width="1500px",
         padding="34px 40px",
         spacing="5",
         align="stretch",
@@ -1250,58 +1453,198 @@ def agent_card(name, role, description, status):
     )
 
 
+def agent_card(name, role, model, tools, status="READY"):
+    return rx.card(
+        rx.vstack(
+            rx.hstack(
+                rx.icon("bot", size=20),
+                rx.vstack(
+                    rx.text(name, weight="bold", size="3"),
+                    rx.text(
+                        role,
+                        size="1",
+                        color=rx.color("gray", 10),
+                    ),
+                    spacing="0",
+                    align="start",
+                ),
+                rx.spacer(),
+                rx.badge(status, variant="soft"),
+                width="100%",
+                align="center",
+            ),
+
+            rx.divider(),
+
+            rx.text(
+                "Default model",
+                size="1",
+                color=rx.color("gray", 10),
+            ),
+            rx.text(model, weight="medium", size="2"),
+
+            rx.text(
+                "Capabilities",
+                size="1",
+                color=rx.color("gray", 10),
+            ),
+            rx.text(
+                tools,
+                size="2",
+                color=rx.color("gray", 11),
+            ),
+
+            rx.button(
+                "Use Agent",
+                variant="soft",
+                size="2",
+                on_click=[
+                    State.set_selected_agent(name),
+                    State.set_page("Command Center"),
+                ],
+            ),
+
+            spacing="3",
+            align="start",
+            width="100%",
+        ),
+        padding="20px",
+        width="100%",
+    )
+
+
 def agents_page():
     return rx.vstack(
-        section_title(
-            "Agent Network",
-            "Agents",
-            "Specialized agents coordinated by Bond with independent permissions and tools.",
+        rx.hstack(
+            section_title(
+                "Agent Runtime",
+                "Agents",
+                (
+                    "Select the intelligence profile Agent 007 "
+                    "uses for each mission."
+                ),
+            ),
+            rx.spacer(),
+            rx.button(
+                rx.icon("refresh-cw", size=15),
+                "Check Providers",
+                on_click=State.refresh_providers,
+                variant="soft",
+            ),
+            width="100%",
+            align="start",
+        ),
+
+        rx.grid(
+            metric(
+                "Selected Agent",
+                State.selected_agent,
+                "Current mission persona",
+                "bot",
+            ),
+            metric(
+                "Model",
+                State.active_model,
+                "Last successful route",
+                "brain",
+            ),
+            metric(
+                "Compute",
+                State.active_compute,
+                "Last successful compute",
+                "cpu",
+            ),
+            metric(
+                "Providers",
+                State.worker_status,
+                State.provider_summary,
+                "network",
+            ),
+            columns="4",
+            spacing="3",
+            width="100%",
         ),
 
         rx.grid(
             agent_card(
                 "Bond",
-                "Chief Orchestrator",
-                "Plans, delegates, monitors and coordinates multi-agent execution.",
-                "ONLINE",
+                "Primary orchestration agent",
+                "Auto",
+                (
+                    "Reasoning · planning · routing · "
+                    "execution control"
+                ),
             ),
             agent_card(
                 "Research",
-                "Intelligence",
-                "Search, synthesis, competitive analysis and source validation.",
-                "STANDBY",
+                "Research and synthesis",
+                "Auto",
+                (
+                    "Investigation · synthesis · evidence · "
+                    "briefings"
+                ),
             ),
             agent_card(
                 "Executive",
-                "Strategy",
-                "Executive summaries, recommendations and decision support.",
-                "STANDBY",
+                "Decision and leadership analysis",
+                "Auto",
+                (
+                    "Executive briefs · options · risk · "
+                    "recommendations"
+                ),
             ),
             agent_card(
                 "Engineering",
-                "Code & Infrastructure",
-                "Repositories, code, testing, infrastructure and technical workflows.",
-                "STANDBY",
+                "Systems and AI infrastructure",
+                "Auto",
+                (
+                    "Architecture · debugging · CUDA · ROCm · "
+                    "cloud · networking"
+                ),
             ),
             agent_card(
                 "Communications",
-                "Email & Messaging",
-                "Drafting, inbox triage and approved communications.",
-                "STANDBY",
-            ),
-            agent_card(
-                "Automation",
-                "Background Operations",
-                "Scheduled work, condition watches and workflow execution.",
-                "STANDBY",
+                "Executive communications",
+                "Auto",
+                (
+                    "Email · posts · summaries · stakeholder "
+                    "communications"
+                ),
             ),
             columns="3",
             spacing="3",
             width="100%",
         ),
 
+        rx.card(
+            rx.vstack(
+                rx.hstack(
+                    rx.icon("shield-check", size=18),
+                    rx.text(
+                        "AGENT EXECUTION POLICY",
+                        weight="bold",
+                    ),
+                ),
+                rx.divider(),
+                rx.text(
+                    (
+                        "Agents may reason and prepare work directly. "
+                        "External writes, sends, publishing and "
+                        "destructive actions will use the Approval "
+                        "layer when those tools are connected."
+                    ),
+                    size="2",
+                    color=rx.color("gray", 10),
+                ),
+                spacing="3",
+                align="start",
+                width="100%",
+            ),
+            padding="22px",
+        ),
+
         width="100%",
-        max_width="1450px",
+        max_width="1500px",
         padding="34px 40px",
         spacing="5",
         align="stretch",
