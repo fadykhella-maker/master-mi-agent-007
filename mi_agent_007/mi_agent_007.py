@@ -50,6 +50,13 @@ class State(rx.State):
     ollama_available: bool = False
     intelligence_checked: bool = False
     last_provider: str = "None"
+    kaggle_available: bool = False
+    openai_available: bool = False
+    anthropic_available: bool = False
+    xai_available: bool = False
+    ollama_available: bool = False
+    intelligence_checked: bool = False
+    last_provider: str = "None"
     active_model: str = "Qwen2.5-1.5B-Instruct"
     active_runtime: str = "vLLM"
     active_compute: str = "Kaggle T4"
