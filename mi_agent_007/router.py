@@ -1,3 +1,4 @@
+import asyncio
 import os
 from dataclasses import dataclass
 from typing import Optional
@@ -76,6 +77,20 @@ def provider_configured(provider: str) -> bool:
     return False
 
 
+async def _wake_kaggle_worker() -> bool:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "sh",
+            "scripts/wake-mi-bond-kaggle.sh",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        await asyncio.wait_for(proc.communicate(), timeout=300)
+        return proc.returncode == 0
+    except Exception:
+        return False
+
+
 async def provider_health() -> dict[str, bool]:
     result = {
         "kaggle": False,
@@ -87,6 +102,13 @@ async def provider_health() -> dict[str, bool]:
 
     try:
         result["kaggle"] = await kaggle_health()
+        if not result["kaggle"] and os.getenv("KAGGLE_API_TOKEN"):
+            await _wake_kaggle_worker()
+            for _ in range(24):
+                if await kaggle_health():
+                    result["kaggle"] = True
+                    break
+                await asyncio.sleep(10)
     except Exception:
         result["kaggle"] = False
 

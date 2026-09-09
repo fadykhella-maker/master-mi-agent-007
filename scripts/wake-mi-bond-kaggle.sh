@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/sh
 
 set -e
 
@@ -28,7 +28,7 @@ fi
 
 echo
 echo "Kaggle CLI:"
-kaggle --version
+python3 -m kaggle --version
 
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mi-bond-agent007-wake.XXXXXX")"
 
@@ -43,7 +43,7 @@ echo "===================================================="
 echo "PULL CURRENT AGENT 007 NOTEBOOK"
 echo "===================================================="
 
-kaggle kernels pull \
+python3 -m kaggle kernels pull \
     "$KERNEL" \
     -p "$TMP_DIR" \
     -m
@@ -91,7 +91,7 @@ echo "===================================================="
 echo "TRIGGER KAGGLE RUN"
 echo "===================================================="
 
-kaggle kernels push \
+python3 -m kaggle kernels push \
     -p "$TMP_DIR"
 
 echo
@@ -110,7 +110,7 @@ for i in $(seq 1 40); do
     echo "Status check $i / 40"
 
     STATUS="$(
-        kaggle kernels status "$KERNEL" 2>&1 || true
+        python3 -m kaggle kernels status "$KERNEL" 2>&1 || true
     )"
 
     echo "$STATUS"
